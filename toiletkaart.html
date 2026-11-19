@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waar kun je 's nachts naar de wc? Openbare toiletten in Amsterdam</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --rolstoel24: #1a7f37;
+    --iedereen24: #2f9fb5;
+    --beperkt:   #e08a00;
+    --parkeer:   #8a8a8a;
+    --man:       #5b4bb7;
+    --tekst: #1f2328; --zacht: #59636e; --lijn: #d8dee4; --bg: #fff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--tekst); font-size: 16px; }
+  .app { display: flex; height: 100%; }
+  aside { width: 380px; max-width: 100%; overflow-y: auto; padding: 20px 22px; border-right: 1px solid var(--lijn); background: var(--bg); }
+  #kaart { flex: 1; }
+  h1 { font-size: 1.35rem; line-height: 1.25; margin: 0 0 8px; }
+  p { line-height: 1.5; margin: 0 0 12px; }
+  .klein { font-size: .85rem; color: var(--zacht); }
+  .cijfers { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0; }
+  .cijfer { border: 1px solid var(--lijn); border-radius: 8px; padding: 10px 12px; }
+  .cijfer b { display: block; font-size: 1.9rem; line-height: 1; margin-bottom: 4px; font-variant-numeric: tabular-nums; }
+  .cijfer span { font-size: .85rem; color: var(--zacht); line-height: 1.3; display: block; }
+  .cijfer.slecht b { color: #b42318; }
+  h2 { font-size: 1rem; margin: 20px 0 8px; }
+  label.laag { display: flex; align-items: center; gap: 10px; padding: 6px 0; cursor: pointer; line-height: 1.3; }
+  label.laag input { width: 18px; height: 18px; margin: 0; }
+  .stip { width: 14px; height: 14px; border-radius: 50%; flex: none; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+  .aantal { margin-left: auto; color: var(--zacht); font-variant-numeric: tabular-nums; }
+  ul { padding-left: 18px; margin: 0 0 12px; } li { margin-bottom: 6px; line-height: 1.45; }
+  .popup h3 { margin: 0 0 4px; font-size: 1rem; }
+  .popup .rij { margin: 2px 0; font-size: .9rem; }
+  .popup .let { background: #fff4e5; border-left: 3px solid var(--beperkt); padding: 6px 8px; margin-top: 8px; font-size: .85rem; }
+  .popup .info { background: #eef6ff; border-left: 3px solid #2f6fdf; padding: 6px 8px; margin-top: 8px; font-size: .85rem; }
+  .popup img { width: 100%; max-height: 160px; object-fit: cover; border-radius: 4px; margin-top: 8px; }
+  button { font: inherit; font-size: .95rem; padding: 9px 14px; border-radius: 8px; border: 1px solid #b9c2cc; background: #f6f8fa; cursor: pointer; }
+  button:hover { background: #eaeef2; }
+  button.breed { width: 100%; margin: 4px 0 4px; }
+  .nodig { background: #f3f7fb; border: 1px solid #cfe0f2; border-radius: 10px; padding: 12px 14px; margin: 0 0 12px; }
+  .nodig h2 { margin-top: 0; }
+  #uitslag { margin-top: 10px; }
+  #uitslag table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  #uitslag td { padding: 5px 0; border-bottom: 1px solid #dde6ef; }
+  #uitslag td.getal { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 8px; }
+  /* Nachtmodus: de kaart wordt donker, het paneel ook */
+  body.nacht .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.85) contrast(.9); }
+  body.nacht aside { background: #161b22; color: #e6edf3; }
+  body.nacht .klein, body.nacht .cijfer span, body.nacht .aantal { color: #9da7b3; }
+  body.nacht .cijfer, body.nacht aside { border-color: #30363d; }
+  body.nacht .nodig { background: #1c2533; border-color: #30405a; }
+  body.nacht #uitslag td { border-color: #30405a; }
+  body.nacht button { background: #21262d; color: #e6edf3; border-color: #3d444d; }
+  body.nacht .cijfer.slecht b { color: #ff7b72; }
+  .bron { border-top: 1px solid var(--lijn); padding-top: 12px; font-size: .9rem; }
+  .bronlabel { background: rgba(255,255,255,.92); padding: 5px 10px; border-radius: 6px; font-size: .9rem; font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,.2); }
+  body.nacht .bronlabel { background: rgba(22,27,34,.92); color: #e6edf3; }
+  body.nacht .bron a { color: #79c0ff; }
+  @media (max-width: 760px) {
+    .app { flex-direction: column-reverse; }
+    aside { width: 100%; height: 48%; border-right: 0; border-top: 1px solid var(--lijn); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside>
+    <h1>Waar kun je 's nachts naar de wc in Amsterdam?</h1>
+    <p>Voor mannen is er bijna overal een plaskrul of urinoir. Wie in een rolstoel zit, of een vrouw is, heeft het veel moeilijker. Deze kaart laat zien welke openbare toiletten <b>24 uur per dag</b> open zijn.</p>
+
+    <div class="cijfers" id="cijfers"></div>
+
+    <div class="nodig">
+      <h2>🚻 Ik moet nodig!</h2>
+      <p>Klik ergens op de kaart. Dan zie je hoe ver een man, een vrouw en een rolstoelgebruiker moeten lopen naar een toilet dat 's nachts open is.</p>
+      <button id="locatie" type="button">📍 Gebruik mijn locatie</button>
+      <div id="uitslag" aria-live="polite"></div>
+    </div>
+
+    <button id="nacht" type="button" class="breed">🌙 Doe het licht uit (het is 3 uur 's nachts)</button>
+
+    <h2>Wat staat er op de kaart?</h2>
+    <div id="lagen"></div>
+    <label class="laag"><input type="checkbox" id="cirkels"> Loopafstand van 500 m rond de 24-uurs rolstoeltoiletten</label>
+
+    <h2>Wat valt op?</h2>
+    <ul>
+      <li>In heel Amsterdam zijn er volgens de gemeente maar <b id="f-rol"></b> openbare rolstoeltoiletten die dag en nacht open zijn. Drie staan in het centrum, één in West (Sloterdijk) en één in Oost (Zeeburgereiland).</li>
+      <li>In Noord, Zuid, Zuidoost en Nieuw-West staat geen enkel 24-uurs rolstoeltoilet. Vanaf de Amsterdamse Poort in de Bijlmer is het dichtstbijzijnde zo'n 6,7 km hemelsbreed.</li>
+      <li>Vanaf Centraal Station is het 1,5 km naar het dichtstbijzijnde 24-uurs rolstoeltoilet. Een man heeft binnen 450 m een urinoir.</li>
+      <li>Het nieuwe ligtoilet in het stadhuis (Stopera) is alleen op werkdagen open.</li>
+      <li>Toiletten in parkeergarages zijn alleen voor parkeerders. Die tellen we niet mee.</li>
+    </ul>
+
+    <h2>Kanttekeningen</h2>
+    <ul class="klein">
+      <li>We gaan uit van wat de gemeente zelf invult. Of een toilet echt open, schoon en werkend is, staat niet in de data.</li>
+      <li>"Rolstoeltoegankelijk" zegt niets over een tillift of verschoontafel.</li>
+      <li>2 toiletten hebben geen locatie, 10 hebben geen openingstijden en bij 4 staan tegenstrijdige gegevens.</li>
+      <li>Afstanden zijn hemelsbreed. Lopen of rollen is altijd verder.</li>
+    </ul>
+    <p class="bron"><b>Bron: Open-Data Gemeente Amsterdam</b><br>Dataset <i>Openbare toiletten</i>, <a href="https://maps.amsterdam.nl/open_geodata/" target="_blank" rel="noopener">maps.amsterdam.nl/open_geodata</a></p>
+    <p class="klein">Achtergrondkaart en luchtfoto: PDOK / Kadaster.</p>
+  </aside>
+  <div id="kaart" role="region" aria-label="Kaart van openbare toiletten"></div>
+</div>
+
+<script>
+const TOILETTEN = [{"nr": 1, "lat": 52.3672802, "lng": 4.8900955, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Singel tov Bloemenmarkt", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8829.jpg", "probleem": "", "opmerking": ""}, {"nr": 2, "lat": 52.3674372, "lng": 4.8892087, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "rolstoel24", "prijs": 0.5, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Koningsplein", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8832.jpg", "probleem": "", "opmerking": ""}, {"nr": 3, "lat": 52.3662449, "lng": 4.8922195, "soort": "Verzinkbaar urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "Urilift", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/reguliersdwarsstraat.JPG", "probleem": "", "opmerking": ""}, {"nr": 11, "lat": 52.3739024, "lng": 4.898217, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Oudekerkplein Zuidzijde", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9103.jpg", "probleem": "", "opmerking": ""}, {"nr": 12, "lat": 52.37708, "lng": 4.892413, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Singel tov 43", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9031.jpg", "probleem": "", "opmerking": ""}, {"nr": 13, "lat": 52.374496, "lng": 4.884908, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Westermarkt Prinsengracht - twee krullen", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9022.jpg", "probleem": "", "opmerking": ""}, {"nr": 14, "lat": 52.373057, "lng": 4.889051, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Singel / Raadhuisstraat", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9027.jpg", "probleem": "", "opmerking": ""}, {"nr": 15, "lat": 52.374254, "lng": 4.889522, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Singel tov 167", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9030.jpg", "probleem": "", "opmerking": ""}, {"nr": 16, "lat": 52.370394, "lng": 4.888361, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Singel tov 311", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9025.jpg", "probleem": "", "opmerking": ""}, {"nr": 17, "lat": 52.378983, "lng": 4.894051, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Brouwersgracht / Singel nabij Singelsluis", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9016.JPG", "probleem": "", "opmerking": ""}, {"nr": 18, "lat": 52.3744669, "lng": 4.898922, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Oudekerkplein noordzijde", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9100.jpg", "probleem": "", "opmerking": ""}, {"nr": 19, "lat": 52.373178, "lng": 4.898609, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Oudezijds Achterburgwal tov 78", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9105.jpg", "probleem": "", "opmerking": ""}, {"nr": 20, "lat": 52.372601, "lng": 4.89816, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Oudezijds Achterburgwal / Brandesteeg", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9106.jpg", "probleem": "", "opmerking": ""}, {"nr": 21, "lat": 52.371457, "lng": 4.89553, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Oudezijds Voorburgwal, Prinsenhof / Hotel The Grand", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9108.jpg", "probleem": "", "opmerking": ""}, {"nr": 22, "lat": 52.364351, "lng": 4.889736, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Nieuwe Spiegelgracht - Keizersgracht", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8834.JPG", "probleem": "", "opmerking": ""}, {"nr": 23, "lat": 52.3639136, "lng": 4.8985876, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Utrechtse straat", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8818.jpg", "probleem": "", "opmerking": ""}, {"nr": 25, "lat": 52.379636, "lng": 4.880664, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Lindengracht", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8981.jpg", "probleem": "", "opmerking": ""}, {"nr": 27, "lat": 52.368764, "lng": 4.877074, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Marnixstraat - Elandsgracht tov bureau van Politie", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8976.jpg", "probleem": "", "opmerking": ""}, {"nr": 29, "lat": 52.3619726, "lng": 4.8864027, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Lijnbaansgracht 282", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8836.jpg", "probleem": "", "opmerking": ""}, {"nr": 30, "lat": 52.3620631, "lng": 4.8961937, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Amstelveld", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8819.jpg", "probleem": "", "opmerking": ""}, {"nr": 31, "lat": 52.3812911, "lng": 4.8801821, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Marnixplantsoen, nabij brug", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9020.jpg", "probleem": "", "opmerking": ""}, {"nr": 33, "lat": 52.358558, "lng": 4.865594, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Geopend wanneer het pierenbadje open is: wanneer het zonnig is en warmer dan 20 graden, van mei t/m september van 10.00 tot 18.00 uur.", "omschrijving": "Nabij het pierenbadje", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/vondelpark01.JPG", "probleem": "", "opmerking": ""}, {"nr": 34, "lat": 52.358575, "lng": 4.871436, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Alleen geopend tijdens evenementen in de lente en (na) zomer", "omschrijving": "nabij openluchtheater", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/vondelpark02.JPG", "probleem": "", "opmerking": ""}, {"nr": 35, "lat": 52.35404, "lng": 4.886989, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Ruysdaelkade / Govert Flinckstraat", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8969.jpg", "probleem": "", "opmerking": ""}, {"nr": 36, "lat": 52.357767, "lng": 4.886433, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur per dag", "omschrijving": "Hobbemakade /  Honthorststraat - Brandweerkazerne", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8936.jpg", "probleem": "", "opmerking": ""}, {"nr": 37, "lat": 52.3556267, "lng": 4.8784841, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Naast het Concertgebouw", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8972.jpg", "probleem": "", "opmerking": ""}, {"nr": 38, "lat": 52.379413, "lng": 4.891667, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Herenmarkt / Brouwersgracht", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9017.JPG", "probleem": "", "opmerking": ""}, {"nr": 39, "lat": 52.37022, "lng": 4.911695, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Kadijksplein ", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/kadijksplein.JPG", "probleem": "", "opmerking": ""}, {"nr": 40, "lat": 52.3676861, "lng": 4.913126, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Kerklaan, nabij ingang Artis", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/artis.JPG", "probleem": "", "opmerking": ""}, {"nr": 42, "lat": 52.360293, "lng": 4.919494, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Oosterpark", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_20190220_125412.jpg", "probleem": "", "opmerking": ""}, {"nr": 45, "lat": 52.3593632, "lng": 4.856356, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Derde kostverlorenkade / Vosmaerstraat", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/Kostverlorenkade.JPG", "probleem": "", "opmerking": ""}, {"nr": 46, "lat": 52.343593, "lng": 4.884215, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Open bij mooi weer, tijdens openingstijden parkkiosk. Zie http://parkkiosk.nl/. Circa 8:00-18:00.", "omschrijving": "Toilet bij kiosk en pierenbad, beheerd door de gemeente", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/beatrixpark.JPG", "probleem": "", "opmerking": ""}, {"nr": 47, "lat": 52.3859969, "lng": 4.9221546, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "", "omschrijving": "Meeuwenlaan / Hamerstraat", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/15505002048947976083692405215953.jpg", "probleem": "", "opmerking": ""}, {"nr": 48, "lat": 52.3903263, "lng": 4.9226835, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "Alleen open als pierenbadje ook open is als het boven de 20 graden is en van mei tot en met september.  Meer informatie: https://www.amsterdam.nl/sport/zwemmen/openbare/", "omschrijving": "Openbaar toilet bij het pierenbadje. Gerenoveerd in 2019", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/15504996584588417992438976311472.jpg", "probleem": "", "opmerking": ""}, {"nr": 49, "lat": 52.3652109, "lng": 4.895908, "soort": "Verzinkbaar urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "Urilift", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8823.jpg", "probleem": "", "opmerking": ""}, {"nr": 50, "lat": 52.3661357, "lng": 4.89684, "soort": "Verzinkbaar urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "Urilift", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8817.jpg", "probleem": "", "opmerking": ""}, {"nr": 51, "lat": 52.3670664, "lng": 4.8954716, "soort": "Verzinkbaar urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "Urilift", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8828.jpg", "probleem": "", "opmerking": ""}, {"nr": 52, "lat": 52.366569, "lng": 4.90012, "soort": "Verzinkbaar urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "Urilift", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8815.jpg", "probleem": "", "opmerking": ""}, {"nr": 58, "lat": 52.3244413, "lng": 4.8934825, "soort": "Overig urinoir", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/Urinoir Amstelpark.JPG", "probleem": "", "opmerking": ""}, {"nr": 59, "lat": 52.3822, "lng": 4.9035267, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "", "omschrijving": "Buiksloterwegveer", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/15504979726392887865421236777614.jpg", "probleem": "", "opmerking": ""}, {"nr": 60, "lat": 52.3634935, "lng": 4.8820227, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "rolstoel24", "prijs": 0.0, "dagen": "", "tijden": "Openbaar toilet, 24/7 in gebruik", "omschrijving": "", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/_IMG7221V3.jpg", "probleem": "", "opmerking": ""}, {"nr": 65, "lat": 52.3740568, "lng": 4.8950783, "soort": "Openbaar toilet", "cat": "iedereen24", "prijs": 0.5, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Beursplein, Fietsenstalling ", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_9109.jpg", "probleem": "", "opmerking": ""}, {"nr": 66, "lat": 52.313946, "lng": 4.9407396, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "", "omschrijving": "Arena, P+R", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 67, "lat": 52.3790613, "lng": 4.8454177, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "P+R (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 68, "lat": 52.3397984, "lng": 4.8897745, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Rai, P+R (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 69, "lat": 52.3900344, "lng": 4.8384517, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "", "tijden": "24 uur per dag", "omschrijving": "P+R (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 70, "lat": 52.3443055, "lng": 4.8551699, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Olympisch Stadion, P+R (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 71, "lat": 52.3638526, "lng": 4.8828409, "soort": "Verzinkbaar urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "Urilift", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8842.jpg", "probleem": "", "opmerking": ""}, {"nr": 72, "lat": 52.3979741, "lng": 4.9363291, "soort": "Overig urinoir", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Buikslotermeerplein / Het Breed, Taxistandplaats", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/Screenshot_20190218_145610.jpg", "probleem": "", "opmerking": ""}, {"nr": 73, "lat": 52.3849458, "lng": 4.8844891, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Willemspoort, Parkeergarage (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 74, "lat": 52.3780827, "lng": 4.9142073, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Parkeergarage (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 75, "lat": 52.3698034, "lng": 4.9085917, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Parkeergarage (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 76, "lat": 52.36735, "lng": 4.9011082, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24 uur per dag", "omschrijving": "Amstel 1, Parkeergarage (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 77, "lat": 52.4078986, "lng": 4.916832, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "", "tijden": "24 uur per dag", "omschrijving": "De Banne, Parkeergarage (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 78, "lat": 52.3103656, "lng": 4.9414285, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "", "tijden": "", "omschrijving": "Parkeergarage ", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 79, "lat": 52.3117427, "lng": 4.9456903, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "", "tijden": "", "omschrijving": "Parkeergarage ", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 80, "lat": 52.3118226, "lng": 4.9384517, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "", "tijden": "", "omschrijving": "Parkeergarage ", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 81, "lat": 52.3623231, "lng": 4.8837227, "soort": "Verzinkbaar urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "Urilift", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8838.jpg", "probleem": "", "opmerking": ""}, {"nr": 85, "lat": 52.3843331, "lng": 4.8836773, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Haarlemmerplein", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/haarlememerplein.JPG", "probleem": "", "opmerking": ""}, {"nr": 86, "lat": 52.3932128, "lng": 4.9939258, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Dorpsweg Ransdorp naast bushalte kerk", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/ransdorp.JPG", "probleem": "", "opmerking": ""}, {"nr": 87, "lat": 52.4132206, "lng": 5.0251367, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Dorpsstraat Holysloot - naast bushalte Kerk", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/holysloot.JPG", "probleem": "", "opmerking": ""}, {"nr": 88, "lat": 52.383644, "lng": 4.9651492, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24", "omschrijving": "Wijkergouw / Schellingwoude Kerk", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/WijkergouwKerkSchellingwoude.JPG", "probleem": "", "opmerking": ""}, {"nr": 89, "lat": 52.3973067, "lng": 4.951276, "soort": "Overig urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Beemesterstraat / IJdoornlaan", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IJDoornlaan_Beemsterstraat.JPG", "probleem": "", "opmerking": ""}, {"nr": 90, "lat": 52.3652648, "lng": 4.9051621, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Nieuwe Keizersgracht / Weesperstraat", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_8813.jpg", "probleem": "", "opmerking": ""}, {"nr": 91, "lat": 52.3632207, "lng": 4.9108778, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Nieuwe Achtergracht / Roetersstraat", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/nieuweprinsengrachtRoetersstraat.jpg", "probleem": "", "opmerking": ""}, {"nr": 92, "lat": 52.3732588, "lng": 4.900592, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur", "omschrijving": "Nieuwmarkt / Geldersekade", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/geldersekadeNieuwmarkt.jpg", "probleem": "", "opmerking": ""}, {"nr": 100, "lat": 52.3678834, "lng": 4.9008307, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr", "tijden": "Alle werkdagen geopend van 08.00 - 18.00 uur en op donderdagen tot 20.00 uur.", "omschrijving": "Stadsloket", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/images4.persgroep.net.jpg", "probleem": "", "opmerking": "In het stadhuis (Stopera) zit ook het nieuwe ligtoilet voor mensen met een ernstige handicap. Maar: alleen open op werkdagen, 's avonds en in het weekend dicht."}, {"nr": 101, "lat": 52.4010569, "lng": 4.9330557, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Alle werkdagen geopend van 08.00 - 18.00 uur en op donderdagen tot 20.00 uur.", "omschrijving": "Stadsloket", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/25473-160906-stadsloket-stadsdeel-noord_AN-6396.jpg", "probleem": "", "opmerking": ""}, {"nr": 102, "lat": 52.356721, "lng": 4.9308932, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr", "tijden": "Alle werkdagen geopend van 08.00 - 18.00 uur en op donderdagen tot 20.00 uur.", "omschrijving": "Stadsloket", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/stadsloket-langer-open-1-300x194.jpg", "probleem": "", "opmerking": ""}, {"nr": 103, "lat": 52.3404557, "lng": 4.8938577, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr", "tijden": "Alle werkdagen geopend van 08.00 - 18.00 uur en op donderdagen tot 20.00 uur.", "omschrijving": "Stadsloket", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/28878-170307-stadsloket-stadsdeel-zuid_an-0002.jpg", "probleem": "", "opmerking": ""}, {"nr": 104, "lat": 52.3781623, "lng": 4.8451906, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr", "tijden": "Alle werkdagen geopend van 08.00 - 18.00 uur en op donderdagen tot 20.00 uur.", "omschrijving": "Stadsloket", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/24882-stadsloket_west_01_23aug2016_e_v_eis.jpg", "probleem": "", "opmerking": ""}, {"nr": 105, "lat": 52.3579491, "lng": 4.8058379, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr", "tijden": "Alle werkdagen geopend van 08.00 - 18.00 uur en op donderdagen tot 20.00 uur.", "omschrijving": "Stadsloket", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/Stadsloket NW.jpg", "probleem": "", "opmerking": ""}, {"nr": 106, "lat": 52.3161816, "lng": 4.9565068, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Alle werkdagen geopend van 08.00 - 18.00 uur en op donderdagen tot 20.00 uur.", "omschrijving": "Stadskantoor", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/24813-10_stadsloket-zo_16aug2016_e_v_eis1.jpg", "probleem": "", "opmerking": ""}, {"nr": 107, "lat": 52.3727418, "lng": 4.8908454, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "do - vr - za", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/PaleisstraatAchterkantDAm.jpg", "probleem": "Let op: dit toilet heeft de openingstijden van een urilift. Waarschijnlijk een fout in de data.", "opmerking": ""}, {"nr": 109, "lat": 52.3295026, "lng": 4.8933753, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Open wanneer het park open is 07:00-18:00 in de winter (1 oktober tot 1 april) 07:00-22:00 in de zomer (1 april tot 1 oktober)", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 160, "lat": 52.3324386, "lng": 4.8920712, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Open wanneer het park open is 07:00-18:00 in de winter (1 oktober tot 1 april) 07:00-22:00 in de zomer (1 april tot 1 oktober)", "omschrijving": "", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/Amstelpark.JPG", "probleem": "", "opmerking": ""}, {"nr": 162, "lat": 52.3659589, "lng": 4.8949128, "soort": "Overig urinoir", "cat": "man", "prijs": 0.0, "dagen": "do - vr - za - zo", "tijden": "alleen tijdens nachtelijke uren", "omschrijving": "Green Pee, urinor met groene uitstraling met planten.", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 163, "lat": 52.366031, "lng": 4.8948618, "soort": "Overig urinoir", "cat": "man", "prijs": 0.0, "dagen": "do - vr - za - zo", "tijden": "alleen tijdens de nachtelijke uren", "omschrijving": "Green Pee, urinor met groene uitstraling met planten.", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 168, "lat": 52.3106669, "lng": 4.9850582, "soort": "Amsterdamse krul", "cat": "man", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "", "omschrijving": "", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/Plaskrul Gaapserpark.jpg", "probleem": "", "opmerking": ""}, {"nr": 179, "lat": 52.3645638, "lng": 4.8922447, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "Maandag t/m vrijdag: 9.00 - 17.00 uur. Zaterdag en zondag: 12.00 - 17.00 uur.", "omschrijving": "Stadsarchief de Bazel", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 180, "lat": 52.3624329, "lng": 4.9085149, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr", "tijden": "Maandag t/m donderdag 9.00 - 18.00 uur. Vrijdag 9.00 - 18.00 uur.", "omschrijving": "GGD Amsterdam", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 182, "lat": 52.3614494, "lng": 4.9212382, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "Alleen open als pierenbadje ook open is als het boven de 20 graden is en van mei tot en met september.  Meer informatie: https://www.amsterdam.nl/sport/zwemmen/openbare/", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 222, "lat": 52.383266, "lng": 4.8537102, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Alleen open als pierenbadje ook open is als het boven de 20 graden is en van mei tot en met september.", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 223, "lat": 52.4139971, "lng": 4.8858894, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Alleen open als pierenbadje ook open is als het boven de 20 graden is en van mei tot en met september.", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 224, "lat": 52.3825225, "lng": 4.8095235, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Alleen open als pierenbadje ook open is als het boven de 20 graden is en van mei tot en met september.", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 225, "lat": 52.3551135, "lng": 4.8176883, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Alleen open als pierenbadje ook open is als het boven de 20 graden is en van mei tot en met september.", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 226, "lat": 52.3274059, "lng": 4.8549056, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 1.0, "dagen": "", "tijden": "De Boswinkel is geopend op woensdag t/m zondag van 10.00 - 17.00 uur.  Toilet is tegen betaling te gebruiken.", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 227, "lat": 52.3243402, "lng": 4.8485826, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "za", "tijden": "10:00-19:00, behalve bij vorst", "omschrijving": "De toiletten van het Klein Kinderbad zijn dagelijks geopend van 10:00 tot 19:00 uur, behalve bij vorst.", "foto": "", "probleem": "Let op: bij 'dagen' staat alleen zaterdag, maar de omschrijving zegt dagelijks open.", "opmerking": ""}, {"nr": 228, "lat": 52.3166175, "lng": 4.8221432, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "10:00 tot 19:00 uur, behalve bij vorst", "omschrijving": "De toiletten van het Groot Kinderbad zijn dagelijks geopend van 10:00 tot 19:00 uur, behalve bij vorst.", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 229, "lat": 52.3213381, "lng": 4.8262613, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Openingstijden zijn van 10.00 - 17.00 uur.", "omschrijving": "Dit toilet is het hele jaar geopend. Bij vorst zijn allen de verwarmde toiletten geopend.", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 231, "lat": 52.3061697, "lng": 4.8166496, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "De openingstijden zijn van 10.00 - 17.00 uur.", "omschrijving": "Dit toilet is het hele jaar geopend", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 232, "lat": 52.3895766, "lng": 4.8383892, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "rolstoel24", "prijs": 0.0, "dagen": "", "tijden": "24 uur per dag", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 243, "lat": 52.3686674, "lng": 4.8897202, "soort": "Verzinkbaar urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 7.00 - 9.00 uur verplaatsing naar ondergronds.", "omschrijving": "Urilift", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 245, "lat": 52.3877248, "lng": 4.8753739, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "Open bij mooi weer van 08:30-16:00. Maandag t/m zondag", "omschrijving": "Toilet bij kiosk. Zie voor meer info http://www.de-parkwachter.nl/", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 246, "lat": 52.3661463, "lng": 4.8970089, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.5, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "Rolstoeltoegankelijk zelfreinigend toilet", "foto": "", "probleem": "Let op: dit toilet heeft de openingstijden van een urilift. Waarschijnlijk een fout in de data.", "opmerking": ""}, {"nr": 247, "lat": 52.3711681, "lng": 4.8932225, "soort": "Toilet in parkeergarage", "cat": "parkeer", "prijs": 0.0, "dagen": "", "tijden": "7 dagen per week, 24 uur per dag", "omschrijving": "Rokin 67, Parkeergarage (alleen voor parkeerders)", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 248, "lat": 52.3733558, "lng": 4.9663353, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "rolstoel24", "prijs": 0.0, "dagen": "", "tijden": "24 uur per dag geopend", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 249, "lat": 52.3732281, "lng": 4.9663138, "soort": "Overig urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "24 uur per dag geopend", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 256, "lat": 52.3595001, "lng": 4.8741075, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 258, "lat": 52.3067169, "lng": 5.0423941, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Alle werkdagen geopend van 08.00 - 18.00 uur en op donderdagen tot 20.00 uur.", "omschrijving": "Stadskantoor", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 260, "lat": 52.3641961, "lng": 4.8831523, "soort": "Verzinkbaar urinoir", "cat": "man", "prijs": 0.0, "dagen": "", "tijden": "Donderdag tot en met zondag van 18.00 - 7.00 uur.  Tussen 15.30 - 18.00 uur verplaatsing naar bovengronds. tussen 07.00 - 09.00 uur verplaatsing naar ondergronds.", "omschrijving": "Urilift", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 261, "lat": 52.3605006, "lng": 4.9196013, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "1 april tot 1 oktober 08.00 – 22.00 uur 1 oktober tot 1 april: 08.00 – 20.00 uur", "omschrijving": "", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/Toilet Oosterpark.png", "probleem": "", "opmerking": ""}, {"nr": 280, "lat": 52.369053, "lng": 4.8775408, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "rolstoel24", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "24/7 geopend", "omschrijving": "Toilet bij Busstation Elandsgracht, tussen busstation en Marnixstraat Gratis te gebruiken", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 281, "lat": 52.3327164, "lng": 4.896208, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Open als de kinderboerderij open is Dagelijks 10:00-15:30, hele jaar rond", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 282, "lat": 52.3581553, "lng": 4.8843402, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "1 april tot 1 oktober: 08.00 - 22.00 1 oktober tot 1 april: 08.00 - 20.00", "omschrijving": "Toilet, geschikt voor rolstoelgebruikers, met buiten twee urinoirs", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/IMG_20260521_165230.jpg", "probleem": "", "opmerking": ""}, {"nr": 287, "lat": 52.32022, "lng": 4.8272213, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "Tijdens vakanties en in het hoogseizoen 7 dagen per week geopend. Buiten deze tijden op maandagen gesloten. Openingstijden dagelijks 10:30-17:00.", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 288, "lat": 52.338888, "lng": 4.8466998, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "Geopend van 07:00 tot 21:00, in de winter mogelijk iets eerder dicht", "omschrijving": "", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 289, "lat": 52.3678698, "lng": 4.9018378, "soort": "Openbaar toilet, rolstoeltoegankelijk", "cat": "beperkt", "prijs": 1.0, "dagen": "ma - di - wo - do - vr - za - zo", "tijden": "7 tot 23", "omschrijving": "Toilet in de markthal", "foto": "", "probleem": "", "opmerking": ""}, {"nr": 290, "lat": 52.3102563, "lng": 4.9880999, "soort": "Openbaar toilet", "cat": "beperkt", "prijs": 0.0, "dagen": "", "tijden": "Volgen", "omschrijving": "Details volgen", "foto": "https://maps.amsterdam.nl/openbare_toiletten/Downloads/Schermafbeelding 2026-11-04 150120.png", "probleem": "Let op: openingstijden en details zijn nog niet ingevuld.", "opmerking": ""}];
+const CIJFERS = {"rolstoel24": 5, "iedereen24": 6, "man24": 44, "totaal": 109};
+
+const LAGEN = [
+  { cat: "rolstoel24", naam: "24 uur open, rolstoeltoegankelijk", aan: true },
+  { cat: "iedereen24", naam: "24 uur open, niet voor rolstoel", aan: true },
+  { cat: "beperkt",    naam: "Niet 24 uur open (beperkte tijden)", aan: true },
+  { cat: "man",        naam: "Alleen voor mannen (krul, urinoir, urilift)", aan: true },
+  { cat: "parkeer",    naam: "Parkeergarage, alleen voor parkeerders", aan: false },
+];
+const kleur = cat => getComputedStyle(document.documentElement).getPropertyValue("--" + cat).trim();
+
+// Kerncijfers
+document.getElementById("cijfers").innerHTML = `
+  <div class="cijfer slecht"><b>${CIJFERS.rolstoel24}</b><span>24-uurs toiletten voor rolstoelgebruikers</span></div>
+  <div class="cijfer slecht"><b>${CIJFERS.iedereen24}</b><span>24-uurs toiletten waar vrouwen terecht kunnen</span></div>
+  <div class="cijfer"><b>${CIJFERS.man24}</b><span>24-uurs plekken voor mannen</span></div>
+  <div class="cijfer"><b>${CIJFERS.totaal}</b><span>toiletten op de kaart in totaal</span></div>`;
+document.getElementById("f-rol").textContent = CIJFERS.rolstoel24;
+
+// De kaart
+const kaart = L.map("kaart").setView([52.365, 4.90], 12);
+
+// Achtergrondkaarten van PDOK (de Nederlandse overheid). Gratis en zonder sleutel.
+const PDOK = "https://service.pdok.nl/";
+const ondergronden = {
+  "Grijze kaart": L.tileLayer(PDOK + "brt/achtergrondkaart/wmts/v2_0/grijs/EPSG:3857/{z}/{x}/{y}.png",
+    { maxZoom: 19, attribution: "Kaart: <a href='https://www.pdok.nl'>PDOK</a> / Kadaster" }),
+  "Kleurenkaart": L.tileLayer(PDOK + "brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png",
+    { maxZoom: 19, attribution: "Kaart: <a href='https://www.pdok.nl'>PDOK</a> / Kadaster" }),
+  "Luchtfoto": L.tileLayer(PDOK + "hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg",
+    { maxZoom: 19, attribution: "Luchtfoto: <a href='https://www.pdok.nl'>PDOK</a> / Beeldmateriaal Nederland" }),
+};
+ondergronden["Grijze kaart"].addTo(kaart);
+kaart.attributionControl.addAttribution("Data: <a href='https://maps.amsterdam.nl/open_geodata/'>Open-Data Gemeente Amsterdam</a>");
+
+// Vast label linksonder op de kaart, zodat de bron ook op een schermafdruk staat
+const bronLabel = L.control({ position: "bottomleft" });
+bronLabel.onAdd = () => {
+  const div = L.DomUtil.create("div", "bronlabel");
+  div.innerHTML = "Bron: Open-Data Gemeente Amsterdam";
+  return div;
+};
+bronLabel.addTo(kaart);
+
+// Reserve: lukt PDOK niet, dan schakelen we automatisch over op de kaart van CARTO.
+let fouten = 0;
+ondergronden["Grijze kaart"].on("tileerror", () => {
+  if (++fouten === 5) {
+    kaart.removeLayer(ondergronden["Grijze kaart"]);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+      maxZoom: 19, attribution: "© OpenStreetMap-bijdragers © CARTO"
+    }).addTo(kaart);
+  }
+});
+L.control.layers(ondergronden, null, { position: "topright" }).addTo(kaart);
+
+const escape = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+function popup(t) {
+  const prijs = t.prijs === 0 ? "gratis" : "€ " + t.prijs.toFixed(2).replace(".", ",");
+  return `<div class="popup">
+    <h3>${escape(t.soort)}</h3>
+    ${t.omschrijving ? `<div class="rij">${escape(t.omschrijving)}</div>` : ""}
+    <div class="rij"><b>Open:</b> ${t.tijden ? escape(t.tijden) : "<i>onbekend</i>"}</div>
+    ${t.dagen ? `<div class="rij"><b>Dagen:</b> ${escape(t.dagen)}</div>` : ""}
+    <div class="rij"><b>Prijs:</b> ${prijs}</div>
+    <div class="rij klein">Nummer ${t.nr}</div>
+    ${t.opmerking ? `<div class="info">${escape(t.opmerking)}</div>` : ""}
+    ${t.probleem ? `<div class="let">${escape(t.probleem)}</div>` : ""}
+    ${t.foto ? `<a href="${encodeURI(t.foto)}" target="_blank" rel="noopener"><img src="${encodeURI(t.foto)}" alt="Foto van het toilet" loading="lazy" onerror="this.remove()"></a>` : ""}
+  </div>`;
+}
+
+const groepen = {};
+const lagenDiv = document.getElementById("lagen");
+LAGEN.forEach(laag => {
+  const groep = L.layerGroup();
+  const lijst = TOILETTEN.filter(t => t.cat === laag.cat);
+  const groot = laag.cat === "rolstoel24" || laag.cat === "iedereen24";
+  lijst.forEach(t => {
+    L.circleMarker([t.lat, t.lng], {
+      radius: groot ? 10 : 6, color: "#fff", weight: 2,
+      fillColor: kleur(laag.cat), fillOpacity: .95
+    }).bindPopup(popup(t), { maxWidth: 280 }).addTo(groep);
+  });
+  groepen[laag.cat] = groep;
+  if (laag.aan) groep.addTo(kaart);
+
+  const label = document.createElement("label");
+  label.className = "laag";
+  label.innerHTML = `<input type="checkbox" data-cat="${laag.cat}" ${laag.aan ? "checked" : ""}>
+    <span class="stip" style="background:${kleur(laag.cat)}"></span>
+    <span>${laag.naam}</span><span class="aantal">${lijst.length}</span>`;
+  label.querySelector("input").addEventListener("change", e => {
+    e.target.checked ? groep.addTo(kaart) : kaart.removeLayer(groep);
+  });
+  lagenDiv.appendChild(label);
+});
+
+// Rolstoel- en 24-uurs toiletten bovenop leggen
+["iedereen24", "rolstoel24"].forEach(c => { if (kaart.hasLayer(groepen[c])) { groepen[c].eachLayer(m => m.bringToFront()); } });
+
+// Cirkels van 500 meter
+const cirkels = L.layerGroup();
+TOILETTEN.filter(t => t.cat === "rolstoel24").forEach(t =>
+  L.circle([t.lat, t.lng], { radius: 500, color: kleur("rolstoel24"), weight: 1, fillOpacity: .12, interactive: false }).addTo(cirkels));
+document.getElementById("cirkels").addEventListener("change", e => {
+  e.target.checked ? cirkels.addTo(kaart) : kaart.removeLayer(cirkels);
+});
+
+// ---------------------------------------------------------------
+// LEUKE FUNCTIE 1: Nachtmodus. Het licht gaat uit, alleen wat 24 uur open is blijft over.
+// ---------------------------------------------------------------
+const nachtKnop = document.getElementById("nacht");
+const lagenAanVoorNacht = {};
+nachtKnop.addEventListener("click", () => {
+  const nacht = document.body.classList.toggle("nacht");
+  nachtKnop.textContent = nacht ? "☀️ Doe het licht weer aan" : "🌙 Doe het licht uit (het is 3 uur 's nachts)";
+  ["beperkt", "parkeer"].forEach(cat => {
+    const vakje = document.querySelector(`input[data-cat="${cat}"]`);
+    if (nacht) { lagenAanVoorNacht[cat] = vakje.checked; vakje.checked = false; kaart.removeLayer(groepen[cat]); }
+    else if (lagenAanVoorNacht[cat]) { vakje.checked = true; groepen[cat].addTo(kaart); }
+    vakje.disabled = nacht;
+  });
+});
+
+// ---------------------------------------------------------------
+// LEUKE FUNCTIE 2: "Ik moet nodig!" Klik op de kaart (of gebruik je locatie)
+// en zie hoe ver een man, een vrouw en een rolstoelgebruiker moeten.
+// ---------------------------------------------------------------
+function afstandM(lat1, lng1, lat2, lng2) {           // haversine, net als in analyse.py
+  const r = 6371000, rad = Math.PI / 180;
+  const a = Math.sin((lat2 - lat1) * rad / 2) ** 2 +
+            Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin((lng2 - lng1) * rad / 2) ** 2;
+  return 2 * r * Math.asin(Math.sqrt(a));
+}
+function dichtstbij(lat, lng, cats) {
+  let beste = null;
+  TOILETTEN.filter(t => cats.includes(t.cat)).forEach(t => {
+    const d = afstandM(lat, lng, t.lat, t.lng);
+    if (!beste || d < beste.d) beste = { t, d };
+  });
+  return beste;
+}
+const tekstAfstand = m => m < 1000 ? Math.round(m / 10) * 10 + " m" : (m / 1000).toFixed(1).replace(".", ",") + " km";
+const minuten = m => Math.max(1, Math.round(m / 75));   // 4,5 km per uur = 75 meter per minuut
+
+const zoekLaag = L.layerGroup().addTo(kaart);
+const WIE = [
+  { naam: "Man",              icoon: "🚹", cats: ["man", "iedereen24", "rolstoel24"], kleur: "man" },
+  { naam: "Vrouw",            icoon: "🚺", cats: ["iedereen24", "rolstoel24"],       kleur: "iedereen24" },
+  { naam: "Rolstoelgebruiker",icoon: "♿", cats: ["rolstoel24"],                     kleur: "rolstoel24" },
+];
+
+function ikMoetNodig(lat, lng) {
+  zoekLaag.clearLayers();
+  L.marker([lat, lng], { title: "Hier ben jij" }).addTo(zoekLaag).bindTooltip("Hier ben jij", { permanent: true, direction: "top", offset: [-15, -12] });
+  const res = WIE.map(w => ({ ...w, ...dichtstbij(lat, lng, w.cats) }));
+  res.forEach(r => {
+    L.polyline([[lat, lng], [r.t.lat, r.t.lng]], { color: kleur(r.kleur), weight: 4, dashArray: "8 8", opacity: .9 })
+      .bindTooltip(`${r.naam}: ${tekstAfstand(r.d)}`).addTo(zoekLaag);
+  });
+  const man = res[0], vrouw = res[1], rol = res[2];
+  const keer = Math.floor(vrouw.d / Math.max(man.d, 1));
+  let grap = "";
+  if (rol.d - man.d > 300) {
+    grap = `Een rolstoelgebruiker is ongeveer <b>${minuten(rol.d) - minuten(man.d)} minuten langer</b> onderweg dan een man.`;
+    if (keer >= 3) grap += ` In de tijd dat een vrouw bij het toilet is, kan een man <b>${keer} keer</b> naar zijn urinoir lopen.`;
+  } else {
+    grap = "Hier heb je geluk: iedereen is ongeveer even snel bij een toilet.";
+  }
+  document.getElementById("uitslag").innerHTML = `
+    <table>${res.map(r => `<tr>
+      <td>${r.icoon} ${r.naam}</td>
+      <td class="getal">${tekstAfstand(r.d)}</td>
+      <td class="getal">± ${minuten(r.d)} min</td></tr>`).join("")}
+    </table>
+    <p>${grap}</p>
+    <p class="klein">Hemelsbreed gemeten, en alleen toiletten die 24 uur open zijn. Echt lopen of rollen is altijd verder.</p>`;
+  kaart.fitBounds(L.latLngBounds([[lat, lng], ...res.map(r => [r.t.lat, r.t.lng])]).pad(0.2));
+}
+
+kaart.on("click", e => ikMoetNodig(e.latlng.lat, e.latlng.lng));
+document.getElementById("locatie").addEventListener("click", () => {
+  const uit = document.getElementById("uitslag");
+  if (!navigator.geolocation) { uit.textContent = "Je browser kan je locatie niet doorgeven. Klik dan op de kaart."; return; }
+  uit.textContent = "Even zoeken waar je bent…";
+  navigator.geolocation.getCurrentPosition(
+    p => ikMoetNodig(p.coords.latitude, p.coords.longitude),
+    () => { uit.textContent = "Je locatie is niet gelukt. Klik dan op de kaart waar je bent."; });
+});
+</script>
+</body>
+</html>
