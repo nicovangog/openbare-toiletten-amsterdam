@@ -71,7 +71,7 @@
 <div class="app">
   <aside>
     <h1>Waar kun je 's nachts naar de wc in Amsterdam?</h1>
-    <p>Voor mannen is er bijna overal een plaskrul of urinoir. Wie in een rolstoel zit, of een vrouw is, heeft het veel moeilijker. Deze kaart laat zien welke openbare toiletten <b>24 uur per dag</b> open zijn.</p>
+    <p>Voor mannen is er bijna overal een plaskrul of urinoir. Voor mensen met een beperking of die in een rolstoel zitten, vrouwen en oudere mensen die hebben het veel moeilijker. Deze kaart laat zien welke openbare toiletten <b>24 uur per dag</b> open zijn.</p>
 
     <div class="cijfers" id="cijfers"></div>
 
@@ -300,8 +300,25 @@ document.getElementById("locatie").addEventListener("click", () => {
   if (!navigator.geolocation) { uit.textContent = "Je browser kan je locatie niet doorgeven. Klik dan op de kaart."; return; }
   uit.textContent = "Even zoeken waar je bent…";
   navigator.geolocation.getCurrentPosition(
-    p => ikMoetNodig(p.coords.latitude, p.coords.longitude),
-    () => { uit.textContent = "Je locatie is niet gelukt. Klik dan op de kaart waar je bent."; });
+    p => {
+      const lat = p.coords.latitude, lng = p.coords.longitude;
+      // Ligt je locatie ver buiten Amsterdam? Dan zeggen we dat eerlijk.
+      if (afstandM(lat, lng, 52.37, 4.90) > 25000) {
+        uit.innerHTML = "Je locatie is gevonden, maar je bent niet in Amsterdam. Klik op de kaart om een plek in Amsterdam te kiezen.";
+        return;
+      }
+      ikMoetNodig(lat, lng);
+    },
+    fout => {
+      // Elke foutcode krijgt een eigen, begrijpelijke uitleg
+      const uitleg = {
+        1: "Je browser mag je locatie niet gebruiken. Klik op het slotje of het locatie-icoon links in de adresbalk en kies 'Toestaan'. Op een Windows-computer moet ook <i>Instellingen → Privacy en beveiliging → Locatie</i> aanstaan.",
+        2: "Je computer weet niet waar hij is. Staat de locatievoorziening van je computer of telefoon aan?",
+        3: "Het zoeken naar je locatie duurde te lang. Probeer het nog eens.",
+      };
+      uit.innerHTML = (uitleg[fout.code] || "Je locatie is niet gelukt.") + "<br><br>Je kunt ook gewoon op de kaart klikken waar je bent.";
+    },
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 });
 });
 </script>
 </body>
